@@ -71,14 +71,31 @@ def main():
             print('Supplier:')
             print('%s' % (values[0][0]))
 
-            productRows = values[6:]
+            header_row = values[5]
+            header_dict = {i: header_row[i] for i in range(len(header_row))}
+            
+            product_rows = values[6:]
+            values_dict_keys = range(len(header_dict))
+            values_dict = {key: list() for key in values_dict_keys}
+            
 
-            for row in productRows:
-                # Print columns A and E, which correspond to indices 0 and 4.
-                if len(row) < 5 or len(row[4]) == 0:
+            for row in product_rows:
+                row_length = len(row)
+                if row_length < 5 or len(row[4]) == 0:
                     break
                 
-                print('%s' % (row[4]))
+                for col_index in values_dict_keys:
+                    column_values = values_dict[col_index]
+
+                    if col_index < row_length:
+                        column_value = row[col_index]
+                    else:
+                        column_value = None
+
+                    column_values.append(column_value)
+
+            dict_with_header_as_keys = {header_dict[i]: values_dict[i] for i in values_dict_keys}
+            print(dict_with_header_as_keys)
 
 if __name__ == '__main__':
     main()
