@@ -1,6 +1,8 @@
 from __future__ import print_function
+import constant
 import pickle
 import os.path
+import product_module
 import time
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -9,8 +11,72 @@ from google.auth.transport.requests import Request
 # If modifying these scopes, delete the file token.pickle.
 SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly', 'https://www.googleapis.com/auth/spreadsheets']
 
-def getName(file):
+def get_name(file):
     return file['name'] 
+
+def parse_product_file_values(values):
+    supplier = values[0][0]
+    print('Supplier:')
+    print('%s' % (supplier))          
+
+    header_row = values[5]
+    header_dict = {i: header_row[i] for i in range(len(header_row))}
+    
+    product_rows = values[6:]
+    values_dict_keys = range(len(header_dict))
+    #values_dict = {key: list() for key in values_dict_keys}
+    
+    for row in product_rows:
+        row_length = len(row)
+        if row_length < 5 or len(row[4]) == 0:
+            break
+
+        product_info_dict = {}
+        
+        for col_index in values_dict_keys:
+            #column_values = values_dict[col_index]
+
+            if col_index < row_length:
+                column_value = row[col_index]
+            else:
+                column_value = None
+
+            header_name = header_dict[col_index]
+            product_info_dict[header_name] = column_value
+
+            #column_values.append(column_value)
+
+    product_name = product_info_dict[constant.PRODUCT_NAME_HEADER]
+    product = product_module.Product(supplier, product_name, product_info_dict)
+    return product
+
+def parse_product_files(files, creds):
+    for file in files:
+        print(u'{0} - {1}'.format(file['name'], file['id']))
+
+
+    sheets_service = build('sheets', 'v4', credentials=creds)
+    # Call the Sheets API
+    sheet = sheets_service.spreadsheets()
+    products = list()
+
+    for file in files:
+        time.sleep(10)
+        spreadsheet_id = file['id']
+        result = sheet.values().get(spreadsheetId=spreadsheet_id,
+                                range='Sortiment').execute()
+        values = result.get('values', [])
+
+        if not values:
+            print('No data found.')
+        else:
+            product = parse_product_file_values(values)
+            products.append(product)
+
+            #dict_with_header_as_keys = {header_dict[i]: values_dict[i] for i in values_dict_keys}
+            # print(dict_with_header_as_keys)
+    
+    return products
 
 def main():
     """Shows basic usage of the Drive v3 API.
@@ -43,59 +109,15 @@ def main():
         fields="files(id, name)", q="'1v-ZSQXTnkD0GPL4aTnugjkOn5DicC_Yz' in parents").execute()
     files = results.get('files', [])
 
-    sortedFiles = sorted(files, key=getName)
+    sorted_files = sorted(files, key=get_name)
 
     if not files:
         print('No files found.')
         return
     
     print('Sorted files:')
-    for file in sortedFiles:
-        print(u'{0} - {1}'.format(file['name'], file['id']))
-
-
-    sheets_service = build('sheets', 'v4', credentials=creds)
-    # Call the Sheets API
-    sheet = sheets_service.spreadsheets()
-
-    for file in sortedFiles:
-        time.sleep(10)
-        spreadsheet_id = file['id']
-        result = sheet.values().get(spreadsheetId=spreadsheet_id,
-                                range='Sortiment').execute()
-        values = result.get('values', [])
-
-        if not values:
-            print('No data found.')
-        else:
-            print('Supplier:')
-            print('%s' % (values[0][0]))
-
-            header_row = values[5]
-            header_dict = {i: header_row[i] for i in range(len(header_row))}
-            
-            product_rows = values[6:]
-            values_dict_keys = range(len(header_dict))
-            values_dict = {key: list() for key in values_dict_keys}
-            
-
-            for row in product_rows:
-                row_length = len(row)
-                if row_length < 5 or len(row[4]) == 0:
-                    break
-                
-                for col_index in values_dict_keys:
-                    column_values = values_dict[col_index]
-
-                    if col_index < row_length:
-                        column_value = row[col_index]
-                    else:
-                        column_value = None
-
-                    column_values.append(column_value)
-
-            dict_with_header_as_keys = {header_dict[i]: values_dict[i] for i in values_dict_keys}
-            print(dict_with_header_as_keys)
+    products = parse_product_files(sorted_files, creds)
+    print(products)
 
 if __name__ == '__main__':
     main()
