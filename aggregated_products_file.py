@@ -34,7 +34,6 @@ def parse_product_file_values(values):
         product_info_dict = {}
         
         for col_index in values_dict_keys:
-            #column_values = values_dict[col_index]
 
             if col_index < row_length:
                 column_value = row[col_index]
@@ -44,9 +43,7 @@ def parse_product_file_values(values):
             header_name = header_dict[col_index]
             product_info_dict[header_name] = column_value
 
-            #column_values.append(column_value)
-
-    product_name = product_info_dict[constant.PRODUCT_NAME_HEADER]
+    product_name = product_info_dict[constant.PRODUCT_NAME]
     product = product_module.Product(supplier, product_name, product_info_dict)
     return product
 
@@ -56,7 +53,6 @@ def parse_product_files(files, creds):
 
 
     sheets_service = build('sheets', 'v4', credentials=creds)
-    # Call the Sheets API
     sheet = sheets_service.spreadsheets()
     products = list()
 
@@ -72,16 +68,10 @@ def parse_product_files(files, creds):
         else:
             product = parse_product_file_values(values)
             products.append(product)
-
-            #dict_with_header_as_keys = {header_dict[i]: values_dict[i] for i in values_dict_keys}
-            # print(dict_with_header_as_keys)
     
     return products
 
 def main():
-    """Shows basic usage of the Drive v3 API.
-    Prints the names and ids of the first 10 files the user has access to.
-    """
     creds = None
     # The file token.pickle stores the user's access and refresh tokens, and is
     # created automatically when the authorization flow completes for the first
@@ -102,8 +92,6 @@ def main():
             pickle.dump(creds, token)
 
     drive_service = build('drive', 'v3', credentials=creds)
-
-    # Call the Drive v3 API
 
     results = drive_service.files().list(
         fields="files(id, name)", q="'1v-ZSQXTnkD0GPL4aTnugjkOn5DicC_Yz' in parents").execute()
