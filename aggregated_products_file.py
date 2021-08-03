@@ -1,4 +1,5 @@
 from __future__ import print_function
+from datetime import datetime
 import constant
 import pickle
 import os.path
@@ -9,10 +10,24 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 
 # If modifying these scopes, delete the file token.pickle.
-SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly', 'https://www.googleapis.com/auth/spreadsheets']
+SCOPES = ['https://www.googleapis.com/auth/drive', 'https://www.googleapis.com/auth/spreadsheets']
 
 def get_name(file):
     return file['name'] 
+
+def save_products_in_new_aggregated_products_file(products, headers, drive_service, sheets_service):
+    formatted_date_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    file_name = constant.TEMPLATE_NAME_FOR_AGGREGATED_PRODUCT_FILE.format(date_time = formatted_date_time)
+    file_metadata = {
+        'name': file_name,
+        'parents': [constant.DRIVE_FOLDER_ID_FOR_AGGREGATED_PRODUCTS_FILES],
+        'mimeType': constant.GOOGLE_SHEET_MIME_TYPE
+    }   
+    file = drive_service.files().create(
+        body = file_metadata,
+        fields = 'id').execute()
+    print(file)
+
 
 def parse_product_file_values(values):
     supplier = values[0][0]
@@ -24,7 +39,6 @@ def parse_product_file_values(values):
     
     product_rows = values[6:]
     values_dict_keys = range(len(header_dict))
-    #values_dict = {key: list() for key in values_dict_keys}
     
     for row in product_rows:
         row_length = len(row)
@@ -47,27 +61,25 @@ def parse_product_file_values(values):
     product = product_module.Product(supplier, product_name, product_info_dict)
     return product
 
-def parse_product_files(files, creds):
-    for file in files:
-        print(u'{0} - {1}'.format(file['name'], file['id']))
+def parse_product_files(files, creds, sheets_service):
+    # for file in files:
+    #     print(u'{0} - {1}'.format(file['name'], file['id']))
 
-
-    sheets_service = build('sheets', 'v4', credentials=creds)
-    sheet = sheets_service.spreadsheets()
+    # sheet = sheets_service.spreadsheets()
     products = list()
 
-    for file in files:
-        time.sleep(10)
-        spreadsheet_id = file['id']
-        result = sheet.values().get(spreadsheetId=spreadsheet_id,
-                                range='Sortiment').execute()
-        values = result.get('values', [])
+    # for file in files:
+    #     time.sleep(10)
+    #     spreadsheet_id = file['id']
+    #     result = sheet.values().get(spreadsheetId=spreadsheet_id,
+    #                             range='Sortiment').execute()
+    #     values = result.get('values', [])
 
-        if not values:
-            print('No data found.')
-        else:
-            product = parse_product_file_values(values)
-            products.append(product)
+    #     if not values:
+    #         print('No data found.')
+    #     else:
+    #         product = parse_product_file_values(values)
+    #         products.append(product)
     
     return products
 
@@ -103,9 +115,14 @@ def main():
         print('No files found.')
         return
     
+    sheets_service = build('sheets', 'v4', credentials=creds)
     print('Sorted files:')
-    products = parse_product_files(sorted_files, creds)
-    print(products)
+    products = parse_product_files(sorted_files, creds, sheets_service)
+    save_products_in_new_aggregated_products_file(
+        products, 
+        constant.ALL_PRODUCT_FILE_HEADERS,
+        drive_service,
+        sheets_service)
 
 if __name__ == '__main__':
     main()
