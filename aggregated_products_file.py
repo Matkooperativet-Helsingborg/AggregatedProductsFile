@@ -15,19 +15,41 @@ SCOPES = ['https://www.googleapis.com/auth/drive', 'https://www.googleapis.com/a
 def get_name(file):
     return file['name'] 
 
-def save_products_in_new_aggregated_products_file(products, headers, drive_service, sheets_service):
+def create_new_aggregated_products_file(drive_service):
     formatted_date_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     file_name = constant.TEMPLATE_NAME_FOR_AGGREGATED_PRODUCT_FILE.format(date_time = formatted_date_time)
     file_metadata = {
         'name': file_name,
         'parents': [constant.DRIVE_FOLDER_ID_FOR_AGGREGATED_PRODUCTS_FILES],
         'mimeType': constant.GOOGLE_SHEET_MIME_TYPE
-    }   
+    }
+
     file = drive_service.files().create(
         body = file_metadata,
         fields = 'id').execute()
-    print(file)
+    return file
 
+def save_products_in_new_aggregated_products_file(products, headers, drive_service, sheets_service):
+    file = create_new_aggregated_products_file(drive_service)
+    print(file)
+    file_id = file['id']
+
+    sheet_body = []
+    sheet_body.append(headers)
+
+    for product in products:
+        product_array = product.toArray(headers)
+        sheet_body.append(product_array)
+	
+    range = 'A2'
+    value_input_option = constant.GOOGLE_SHEET_VALUE_INPUT_OPTION_TO_USE
+    body = {
+        'values': sheet_body
+    }
+    result = sheets_service.spreadsheets().values().update(
+        spreadsheetId=file_id, range=range,
+        valueInputOption=value_input_option, body=body).execute()
+    print('{0} cells updated.'.format(result.get('updatedCells')))
 
 def parse_product_file_values(values):
     supplier = values[0][0]
@@ -61,25 +83,25 @@ def parse_product_file_values(values):
     product = product_module.Product(supplier, product_name, product_info_dict)
     return product
 
-def parse_product_files(files, creds, sheets_service):
-    # for file in files:
-    #     print(u'{0} - {1}'.format(file['name'], file['id']))
+def parse_product_files(files, sheets_service):
+    for file in files[:10]:
+        print(u'{0} - {1}'.format(file['name'], file['id']))
 
-    # sheet = sheets_service.spreadsheets()
+    sheet = sheets_service.spreadsheets()
     products = list()
 
-    # for file in files:
-    #     time.sleep(10)
-    #     spreadsheet_id = file['id']
-    #     result = sheet.values().get(spreadsheetId=spreadsheet_id,
-    #                             range='Sortiment').execute()
-    #     values = result.get('values', [])
+    for file in files[:10]:
+        time.sleep(10)
+        spreadsheet_id = file['id']
+        result = sheet.values().get(spreadsheetId=spreadsheet_id,
+                                range='Sortiment').execute()
+        values = result.get('values', [])
 
-    #     if not values:
-    #         print('No data found.')
-    #     else:
-    #         product = parse_product_file_values(values)
-    #         products.append(product)
+        if not values:
+            print('No data found.')
+        else:
+            product = parse_product_file_values(values)
+            products.append(product)
     
     return products
 
@@ -117,7 +139,7 @@ def main():
     
     sheets_service = build('sheets', 'v4', credentials=creds)
     print('Sorted files:')
-    products = parse_product_files(sorted_files, creds, sheets_service)
+    products = parse_product_files(sorted_files, sheets_service)
     save_products_in_new_aggregated_products_file(
         products, 
         constant.ALL_PRODUCT_FILE_HEADERS,
