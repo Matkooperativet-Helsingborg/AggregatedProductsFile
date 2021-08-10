@@ -35,10 +35,11 @@ def save_products_in_new_aggregated_products_file(products, headers, drive_servi
     file_id = file['id']
 
     sheet_body = []
-    sheet_body.append(headers)
+    headers_including_supplier = [constant.SUPPLIER] + headers
+    sheet_body.append(headers_including_supplier)
 
     for product in products:
-        product_array = product.toArray(headers)
+        product_array = product.toArrayIncludingSupplier(headers)
         sheet_body.append(product_array)
 	
     range = 'A2'
@@ -61,6 +62,7 @@ def parse_product_file_values(values):
     
     product_rows = values[6:]
     values_dict_keys = range(len(header_dict))
+    products_in_file = []
     
     for row in product_rows:
         row_length = len(row)
@@ -79,18 +81,19 @@ def parse_product_file_values(values):
             header_name = header_dict[col_index]
             product_info_dict[header_name] = column_value
 
-    product_name = product_info_dict[constant.PRODUCT_NAME]
-    product = product_module.Product(supplier, product_name, product_info_dict)
-    return product
+        product_name = product_info_dict[constant.PRODUCT_NAME]
+        product = product_module.Product(supplier, product_name, product_info_dict)
+        products_in_file.append(product)
+    return products_in_file
 
 def parse_product_files(files, sheets_service):
-    for file in files[:10]:
+    for file in files:
         print(u'{0} - {1}'.format(file['name'], file['id']))
 
     sheet = sheets_service.spreadsheets()
     products = list()
 
-    for file in files[:10]:
+    for file in files:
         time.sleep(10)
         spreadsheet_id = file['id']
         result = sheet.values().get(spreadsheetId=spreadsheet_id,
@@ -100,8 +103,8 @@ def parse_product_files(files, sheets_service):
         if not values:
             print('No data found.')
         else:
-            product = parse_product_file_values(values)
-            products.append(product)
+            supplier_products = parse_product_file_values(values)
+            products.extend(supplier_products)
     
     return products
 
